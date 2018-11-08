@@ -8,17 +8,17 @@ import me.qoomon.maven.extension.gitversioning.config.model.VersionFormatDescrip
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.building.Source;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.model.*;
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Parent;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginExecution;
 import org.apache.maven.model.building.DefaultModelProcessor;
 import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.session.scope.internal.SessionScope;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.logging.Logger;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
@@ -27,10 +27,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-import java.util.*;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 
 /**
@@ -269,6 +274,9 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
         try (Repository repository = repositoryBuilder.build()) {
 
+            final String describe = GitUtil.getGitDescribe(repository);
+            final String describeTag = GitUtil.getGitDescribeLastTag(repository);
+
             final String headCommit = GitUtil.getHeadCommit(repository);
 
             final Status status = GitUtil.getStatus(repository);
@@ -332,6 +340,8 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             projectVersionDataMap.put("commit.short", headCommit.substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(getRegexGroupValueMap(projectVersionFormatDescription.pattern, projectCommitRefName));
+            projectVersionDataMap.put("describe", describe);
+            projectVersionDataMap.put("describe.last.tag", describeTag);
             String version = subsituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap);
             return new GitBasedProjectVersion(escapeVersion(version),
                     headCommit, projectCommitRefName, projectCommitRefType,

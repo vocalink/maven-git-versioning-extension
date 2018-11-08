@@ -156,7 +156,17 @@ For Custom Configuration create `${project.basedir}/.mvn/maven-git-versioning-ex
       <pattern><![CDATA[(?<type>[^/]*)/(?<name>.*)]]></pattern>
       <versionformat>${type}-${name}</versionformat>
       ```
-      
+
+- `${describe}`
+
+  - the value from git describe including tag, number of commits since tag and last commit identifier. Returns 0 in the absence of a previous commit.
+  - e.g. '1.1.188-1-g5ca6cb5da'
+
+- `${describe.last.tag}`
+
+  - the last tag, originating from git describe command. Returns 0 in the absence of a previous tag.
+  - e.g. '1.1.188'
+
 ### Parameters & Environment Variables
 
 - Provide **branch** or **tag** name
