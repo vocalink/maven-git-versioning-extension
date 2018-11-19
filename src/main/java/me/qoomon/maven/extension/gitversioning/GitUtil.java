@@ -73,4 +73,12 @@ public class GitUtil {
         }
         return head.getName();
     }
+
+    public static String getLastTag(Repository repository) throws IOException {
+        try {
+            return Git.wrap(repository).describe().setTags(true).call();
+        } catch (GitAPIException e) {
+            throw new RuntimeException(e);
+        }
+    }
 }

@@ -291,6 +291,8 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                 }
             }
 
+            String lastTag = GitUtil.getLastTag(repository);
+
             // default versioning
             VersionFormatDescription projectVersionFormatDescription = configuration.getCommitVersionDescription();
             String projectCommitRefType = "commit";
@@ -332,6 +334,7 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             projectVersionDataMap.put("commit.short", headCommit.substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(getRegexGroupValueMap(projectVersionFormatDescription.pattern, projectCommitRefName));
+            addVersionInformation("lastTag", lastTag, projectVersionDataMap);
             String version = subsituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap);
             return new GitBasedProjectVersion(escapeVersion(version),
                     headCommit, projectCommitRefName, projectCommitRefType,
@@ -349,6 +352,22 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
     private Map<String, String> mergeProperties(Map<String, String> map) {
         configuration.getProperties().forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
         return map;
+    }
+
+    private void addVersionInformation(String key, String value, Map<String, String> projectVersionDataMap) {
+        if (value != null && !value.isEmpty()) {
+            projectVersionDataMap.put(key, value);
+            VersionInformation versionInfo = new VersionInformation(value);
+            projectVersionDataMap.put(key + ".majorVersion", String.valueOf(versionInfo.getMajor()));
+            projectVersionDataMap.put(key + ".minorVersion", String.valueOf(versionInfo.getMinor()));
+            projectVersionDataMap.put(key + ".incrementalVersion", String.valueOf(versionInfo.getPatch()));
+            projectVersionDataMap.put(key + ".buildNumber", String.valueOf(versionInfo.getBuildNumber()));
+            projectVersionDataMap.put(key + ".qualifier", versionInfo.getQualifier());
+            projectVersionDataMap.put(key + ".nextMajorVersion", String.valueOf(versionInfo.getMajor() + 1));
+            projectVersionDataMap.put(key + ".nextMinorVersion", String.valueOf(versionInfo.getMinor() + 1));
+            projectVersionDataMap.put(key + ".nextIncrementalVersion", String.valueOf(versionInfo.getPatch() + 1));
+            projectVersionDataMap.put(key + ".nextBuildNumber", String.valueOf(versionInfo.getBuildNumber() + 1));
+        }
     }
 
     /**
