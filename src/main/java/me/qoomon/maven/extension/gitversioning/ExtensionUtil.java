@@ -13,4 +13,16 @@ public class ExtensionUtil {
         File rootProjectDirectory = request.getMultiModuleProjectDirectory();
         return new File(rootProjectDirectory, ".mvn/" + artifactId + ".xml");
     }
+
+    public static File getPropertiesFile(MavenExecutionRequest request, String artifactId, String fileName) {
+        if(fileName == null || fileName.isEmpty()) {
+            fileName = ".mvn/" + artifactId + ".properties";
+        }
+        File propertiesFile = new File(fileName);
+        if (!propertiesFile.isAbsolute()) {
+            File rootProjectDirectory = request.getMultiModuleProjectDirectory();
+            propertiesFile = new File(rootProjectDirectory, fileName);
+        }
+        return propertiesFile;
+    }
 }

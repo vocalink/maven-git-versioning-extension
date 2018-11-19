@@ -327,7 +327,7 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                     }
                 }
 
-            Map<String, String> projectVersionDataMap = buildCommonVersionDataMap(gav);
+            Map<String, String> projectVersionDataMap = mergeProperties(buildCommonVersionDataMap(gav));
             projectVersionDataMap.put("commit", headCommit);
             projectVersionDataMap.put("commit.short", headCommit.substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
@@ -344,6 +344,11 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
         versionDataMap.put("version", gav.getVersion());
         versionDataMap.put("version.release", gav.getVersion().replaceFirst("-SNAPSHOT$", ""));
         return versionDataMap;
+    }
+
+    private Map<String, String> mergeProperties(Map<String, String> map) {
+        configuration.getProperties().forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
+        return map;
     }
 
     /**

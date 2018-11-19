@@ -14,9 +14,10 @@ import org.simpleframework.xml.Serializer;
 import org.simpleframework.xml.core.Persister;
 
 import javax.inject.Inject;
-import java.io.File;
+import java.io.*;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Created by qoomon on 30/11/2016.
@@ -45,6 +46,7 @@ public class VersioningConfigurationProvider {
             List<VersionFormatDescription> branchVersionDescriptions = Lists.newArrayList(defaultBranchVersionFormat());
             List<VersionFormatDescription> tagVersionDescriptions = new LinkedList<>();
             VersionFormatDescription commitVersionDescription = defaultCommitVersionFormat();
+            String propertiesFileName = null;
 
             File configFile = ExtensionUtil.getConfigFile(session.getRequest(), BuildProperties.projectArtifactId());
             if (configFile.exists()) {
@@ -55,11 +57,17 @@ public class VersioningConfigurationProvider {
                 if (configurationModel.commitVersionFormat != null) {
                     commitVersionDescription = new VersionFormatDescription(".*", "", configurationModel.commitVersionFormat);
                 }
+                propertiesFileName = configurationModel.propertiesFileName;
             } else {
                 logger.info("No configuration file found. Apply default configuration.");
             }
 
             configuration = new VersioningConfiguration(branchVersionDescriptions, tagVersionDescriptions, commitVersionDescription);
+
+            File propertiesFile = ExtensionUtil.getPropertiesFile(session.getRequest(), BuildProperties.projectArtifactId(), propertiesFileName);
+            if (propertiesFile.exists()) {
+                configuration.setProperties(loadProperties(propertiesFile));
+            }
         }
 
         return configuration;
@@ -84,4 +92,15 @@ public class VersioningConfigurationProvider {
         }
     }
 
+    private Properties loadProperties(File propertiesFile) {
+        try {
+            logger.debug("load properties from " + propertiesFile);
+            InputStream stream = new FileInputStream(propertiesFile);
+            Properties properties = new Properties();
+            properties.load(stream);
+            return properties;
+        } catch (IOException e) {
+            throw new RuntimeException(propertiesFile.toString(), e);
+        }
+    }
 }
