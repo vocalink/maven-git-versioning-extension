@@ -47,6 +47,7 @@ public class VersioningConfigurationProvider {
             List<VersionFormatDescription> tagVersionDescriptions = new LinkedList<>();
             VersionFormatDescription commitVersionDescription = defaultCommitVersionFormat();
             String propertiesFileName = null;
+            boolean includeProperties = false;
 
             File configFile = ExtensionUtil.getConfigFile(session.getRequest(), BuildProperties.projectArtifactId());
             if (configFile.exists()) {
@@ -58,11 +59,12 @@ public class VersioningConfigurationProvider {
                     commitVersionDescription = new VersionFormatDescription(".*", "", configurationModel.commitVersionFormat);
                 }
                 propertiesFileName = configurationModel.propertiesFileName;
+                includeProperties = configurationModel.includeProperties;
             } else {
                 logger.info("No configuration file found. Apply default configuration.");
             }
 
-            configuration = new VersioningConfiguration(branchVersionDescriptions, tagVersionDescriptions, commitVersionDescription);
+            configuration = new VersioningConfiguration(branchVersionDescriptions, tagVersionDescriptions, commitVersionDescription, includeProperties);
 
             File propertiesFile = ExtensionUtil.getPropertiesFile(session.getRequest(), BuildProperties.projectArtifactId(), propertiesFileName);
             if (propertiesFile.exists()) {

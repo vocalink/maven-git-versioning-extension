@@ -14,11 +14,7 @@ import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.session.scope.internal.SessionScope;
 import org.codehaus.plexus.component.annotations.Component;
 import org.codehaus.plexus.logging.Logger;
-import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
-import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.lib.Constants;
-import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
 import org.eclipse.jgit.storage.file.FileRepositoryBuilder;
 
@@ -30,7 +26,6 @@ import java.io.Reader;
 import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.stream.Collectors;
 
 
 /**
@@ -136,21 +131,28 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             }
 
             // log only once per GAV
+            final String version = projectGitBasedVersion.getVersion();
             if (loggerProjectModuleSet.add(projectGav)) {
                 logger.info(projectGav.getArtifactId() + ":" + projectGav.getVersion()
                         + " - " + projectGitBasedVersion.getCommitRefType() + ": " + projectGitBasedVersion.getCommitRefName()
-                        + " -> version: " + projectGitBasedVersion.getVersion());
+                        + " -> version: " + version);
             }
 
             if (projectModel.getVersion() != null) {
                 logger.debug("set project version to " + projectGitBasedVersion + " in " + projectPomFile);
-                virtualProjectModel.setVersion(projectGitBasedVersion.getVersion());
+                virtualProjectModel.setVersion(version);
             }
 
             logger.debug("add project properties");
             virtualProjectModel.addProperty("project.commit", projectGitBasedVersion.getCommit());
             virtualProjectModel.addProperty("project.tag", projectGitBasedVersion.getCommitRefType().equals("tag") ? projectGitBasedVersion.getCommitRefName() : "");
             virtualProjectModel.addProperty("project.branch", projectGitBasedVersion.getCommitRefType().equals("branch") ? projectGitBasedVersion.getCommitRefName() : "");
+            if(configuration.isIncludeProperties()) {
+                addVersionInformation("version", version, projectGitBasedVersion.getProjectVersionDataMap());
+                projectGitBasedVersion.getProjectVersionDataMap().entrySet().stream()
+                        .filter(entry -> !entry.getKey().equals("version") && entry.getValue() != null)
+                        .forEach(entry -> virtualProjectModel.addProperty("project." + entry.getKey(), entry.getValue()));
+            }
 
 
             // ---------------- handle parent git based version ----------------
@@ -334,11 +336,12 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             projectVersionDataMap.put("commit.short", headCommit.substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(getRegexGroupValueMap(projectVersionFormatDescription.pattern, projectCommitRefName));
-            addVersionInformation("lastTag", lastTag, projectVersionDataMap);
+            Optional.ofNullable(lastTag).ifPresent(value -> projectVersionDataMap.put("lastTag", value));
+            Optional.ofNullable(projectVersionDataMap.get("lastTag")).ifPresent(value -> addVersionInformation("lastTag", value, projectVersionDataMap));
             String version = subsituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap);
             return new GitBasedProjectVersion(escapeVersion(version),
                     headCommit, projectCommitRefName, projectCommitRefType,
-                    repository.getDirectory().getParentFile(), !status.isClean());
+                    repository.getDirectory().getParentFile(), !status.isClean(), projectVersionDataMap);
         }
     }
 
@@ -356,7 +359,6 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
     private void addVersionInformation(String key, String value, Map<String, String> projectVersionDataMap) {
         if (value != null && !value.isEmpty()) {
-            projectVersionDataMap.put(key, value);
             VersionInformation versionInfo = new VersionInformation(value);
             projectVersionDataMap.put(key + ".majorVersion", String.valueOf(versionInfo.getMajor()));
             projectVersionDataMap.put(key + ".minorVersion", String.valueOf(versionInfo.getMinor()));
@@ -426,10 +428,11 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
         private final String commitRefType;
         private final File repositoryPath;
         private final boolean repositoryDirty;
+        private final Map<String, String> projectVersionDataMap;
 
         GitBasedProjectVersion(String version,
                                String commit, String commitRefName, String commitRefType,
-                               File repositoryPath, boolean repositoryDirty) {
+                               File repositoryPath, boolean repositoryDirty, Map<String, String> projectVersionDataMap) {
             this.version = version;
 
             this.commit = commit;
@@ -438,6 +441,8 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
             this.repositoryPath = repositoryPath;
             this.repositoryDirty = repositoryDirty;
+
+            this.projectVersionDataMap = projectVersionDataMap;
         }
 
         String getVersion() {
@@ -462,6 +467,10 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
         boolean isRepositoryDirty() {
             return repositoryDirty;
+        }
+
+        Map<String, String> getProjectVersionDataMap() {
+            return projectVersionDataMap;
         }
 
         @Override

@@ -15,13 +15,16 @@ public class VersioningConfiguration {
     private final List<VersionFormatDescription> tagVersionDescriptions;
     private final VersionFormatDescription commitVersionDescription;
     private final Properties properties = new Properties();
+    private final boolean includeProperties;
 
     public VersioningConfiguration(List<VersionFormatDescription> branchVersionDescriptions,
                                    List<VersionFormatDescription> tagVersionDescriptions,
-                                   VersionFormatDescription commitVersionDescription) {
+                                   VersionFormatDescription commitVersionDescription,
+                                   Boolean includeProperties) {
         this.branchVersionDescriptions = Objects.requireNonNull(branchVersionDescriptions);
         this.tagVersionDescriptions = Objects.requireNonNull(tagVersionDescriptions);
         this.commitVersionDescription = Objects.requireNonNull(commitVersionDescription);
+        this.includeProperties = includeProperties;
     }
 
     public void setProperties(Properties properties) {
@@ -42,5 +45,9 @@ public class VersioningConfiguration {
 
     public VersionFormatDescription getCommitVersionDescription() {
         return commitVersionDescription;
+    }
+
+    public boolean isIncludeProperties() {
+        return includeProperties;
     }
 }
