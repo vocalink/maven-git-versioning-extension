@@ -337,7 +337,13 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(getRegexGroupValueMap(projectVersionFormatDescription.pattern, projectCommitRefName));
             Optional.ofNullable(lastTag).ifPresent(value -> projectVersionDataMap.put("lastTag", value));
-            Optional.ofNullable(projectVersionDataMap.get("lastTag")).ifPresent(value -> addVersionInformation("lastTag", value, projectVersionDataMap));
+            Optional.ofNullable(projectVersionDataMap.get("lastTag")).ifPresent(value -> {
+                for (VersionFormatDescription versionFormatDescription : configuration.getTagVersionDescriptions())
+                    if(value.matches(versionFormatDescription.pattern)) {
+                        addVersionInformation("lastTag", removePrefix(value, versionFormatDescription.prefix), projectVersionDataMap);
+                        break;
+                    }
+            });
             String version = subsituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap);
             return new GitBasedProjectVersion(escapeVersion(version),
                     headCommit, projectCommitRefName, projectCommitRefType,

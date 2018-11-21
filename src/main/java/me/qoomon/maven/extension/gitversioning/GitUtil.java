@@ -5,12 +5,14 @@ import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
+import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
 
 import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 public class GitUtil {
@@ -74,10 +76,11 @@ public class GitUtil {
         return head.getName();
     }
 
-    public static String getLastTag(Repository repository) throws IOException {
+    public static String getLastTag(Repository repository) {
         try {
-            return Git.wrap(repository).describe().setTags(true).call();
-        } catch (GitAPIException e) {
+            final List<Ref> tags = repository.getRefDatabase().getRefsByPrefix("refs/tags/");
+            return tags.isEmpty() ? null : tags.get(tags.size() - 1).getName().replaceFirst(Pattern.quote("refs/tags/"), "");
+        } catch (IOException e) {
             throw new RuntimeException(e);
         }
     }
