@@ -7,11 +7,10 @@ import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
+import org.eclipse.jgit.revwalk.RevWalk;
 
 import java.io.IOException;
-import java.util.Collections;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
@@ -77,11 +76,27 @@ public class GitUtil {
     }
 
     public static String getLastTag(Repository repository) {
+        String tag = null;
+
         try {
+            final RevWalk walk = new RevWalk(repository);
             final List<Ref> tags = repository.getRefDatabase().getRefsByPrefix("refs/tags/");
-            return tags.isEmpty() ? null : tags.get(tags.size() - 1).getName().replaceFirst(Pattern.quote("refs/tags/"), "");
+
+            if(!tags.isEmpty()) {
+                final ArrayList<Ref> sorted = new ArrayList<>(tags);
+                sorted.sort(Comparator.comparing(o -> {
+                    try {
+                        return walk.parseTag(o.getObjectId()).getTaggerIdent().getWhen();
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                }));
+                tag = sorted.get(sorted.size() - 1).getName().replaceFirst(Pattern.quote("refs/tags/"), "");
+            }
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+
+        return tag;
     }
 }
