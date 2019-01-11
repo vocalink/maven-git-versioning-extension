@@ -24,4 +24,9 @@ public class Configuration {
     @Element(name = "versionFormat")
     public String commitVersionFormat;
 
+    @Element(name = "propertiesFile", required = false)
+    public String propertiesFileName;
+
+    @Element(name = "includeProperties", required = false)
+    public boolean includeProperties = false;
 }

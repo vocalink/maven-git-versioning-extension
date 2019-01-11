@@ -3,6 +3,7 @@ package me.qoomon.maven.extension.gitversioning.config;
 import com.google.common.collect.Lists;
 import com.google.inject.Key;
 import me.qoomon.maven.extension.gitversioning.BuildProperties;
+import me.qoomon.maven.extension.gitversioning.ExtensionUtil;
 import me.qoomon.maven.extension.gitversioning.config.model.Configuration;
 import me.qoomon.maven.extension.gitversioning.config.model.VersionFormatDescription;
 import org.apache.maven.execution.MavenExecutionRequest;
@@ -14,9 +15,10 @@ import org.simpleframework.xml.Serializer;
 import org.simpleframework.xml.core.Persister;
 
 import javax.inject.Inject;
-import java.io.File;
+import java.io.*;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Properties;
 
 /**
  * Created by qoomon on 30/11/2016.
@@ -52,8 +54,10 @@ public class VersioningConfigurationProvider {
         List<VersionFormatDescription> branchVersionDescriptions = Lists.newArrayList(defaultBranchVersionFormat());
         List<VersionFormatDescription> tagVersionDescriptions = new LinkedList<>();
         VersionFormatDescription commitVersionDescription = defaultCommitVersionFormat();
+        String propertiesFileName = null;
+        boolean includeProperties = false;
 
-        File configFile = getConfigFile(session.getRequest());
+        File configFile = ExtensionUtil.getConfigFile(session.getRequest(), BuildProperties.projectArtifactId());
         if (configFile.exists()) {
             Configuration configurationModel = loadConfiguration(configFile);
             branchVersionDescriptions.addAll(0, configurationModel.branches);
@@ -61,6 +65,8 @@ public class VersioningConfigurationProvider {
             if (configurationModel.commitVersionFormat != null) {
                 commitVersionDescription = new VersionFormatDescription(".*", "", configurationModel.commitVersionFormat);
             }
+            propertiesFileName = configurationModel.propertiesFileName;
+            includeProperties = configurationModel.includeProperties;
         } else {
             logger.info("No configuration file found. Apply default configuration.");
         }
@@ -101,7 +107,16 @@ public class VersioningConfigurationProvider {
             providedCommit = null;
         }
 
-        return new VersioningConfiguration(enabledExtension, branchVersionDescriptions, tagVersionDescriptions, commitVersionDescription, providedBranch, providedTag, providedCommit);
+        final VersioningConfiguration configuration = new VersioningConfiguration(enabledExtension, branchVersionDescriptions,
+                tagVersionDescriptions, commitVersionDescription, providedBranch, providedTag, providedCommit,
+                includeProperties);
+
+        File propertiesFile = ExtensionUtil.getPropertiesFile(session.getRequest(), BuildProperties.projectArtifactId(), propertiesFileName);
+        if (propertiesFile.exists()) {
+            configuration.setProperties(loadProperties(propertiesFile));
+        }
+
+        return configuration;
     }
 
     private static VersionFormatDescription defaultBranchVersionFormat() {
@@ -122,8 +137,15 @@ public class VersioningConfigurationProvider {
         }
     }
 
-    private static File getConfigFile(MavenExecutionRequest request) {
-        return new File(request.getMultiModuleProjectDirectory(), ".mvn/" + BuildProperties.projectArtifactId() + ".xml");
+    private Properties loadProperties(File propertiesFile) {
+        try {
+            logger.debug("load properties from " + propertiesFile);
+            InputStream stream = new FileInputStream(propertiesFile);
+            Properties properties = new Properties();
+            properties.load(stream);
+            return properties;
+        } catch (IOException e) {
+            throw new RuntimeException(propertiesFile.toString(), e);
+        }
     }
-
 }

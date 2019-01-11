@@ -4,6 +4,7 @@ import me.qoomon.maven.extension.gitversioning.config.model.VersionFormatDescrip
 
 import java.util.List;
 import java.util.Objects;
+import java.util.Properties;
 
 /**
  * Created by qoomon on 30/11/2016.
@@ -17,11 +18,14 @@ public class VersioningConfiguration {
     private final String providedBranch;
     private final String providedTag;
     private final String providedCommit;
+    private final Properties properties = new Properties();
+    private final boolean includeProperties;
 
     public VersioningConfiguration(boolean enabled, List<VersionFormatDescription> branchVersionDescriptions,
                                    List<VersionFormatDescription> tagVersionDescriptions,
                                    VersionFormatDescription commitVersionDescription,
-                                   String providedBranch, String providedTag, String providedCommit) {
+                                   String providedBranch, String providedTag, String providedCommit,
+                                   Boolean includeProperties) {
         this.enabled = enabled;
         this.branchVersionDescriptions = Objects.requireNonNull(branchVersionDescriptions);
         this.tagVersionDescriptions = Objects.requireNonNull(tagVersionDescriptions);
@@ -29,6 +33,15 @@ public class VersioningConfiguration {
         this.providedBranch = providedBranch;
         this.providedTag = providedTag;
         this.providedCommit = providedCommit;
+        this.includeProperties = includeProperties;
+    }
+
+    public void setProperties(Properties properties) {
+        this.properties.putAll(properties);
+    }
+
+    public Properties getProperties() {
+        return properties;
     }
 
     public List<VersionFormatDescription> getBranchVersionDescriptions() {
@@ -57,5 +70,9 @@ public class VersioningConfiguration {
 
     public String getProvidedCommit() {
         return providedCommit;
+    }
+
+    public boolean isIncludeProperties() {
+        return includeProperties;
     }
 }

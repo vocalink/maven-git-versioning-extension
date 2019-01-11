@@ -151,6 +151,12 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             virtualProjectModel.addProperty("project.commit", projectGitBasedVersion.getCommit());
             virtualProjectModel.addProperty("project.tag", projectGitBasedVersion.getCommitRefType().equals("tag") ? projectGitBasedVersion.getCommitRefName() : "");
             virtualProjectModel.addProperty("project.branch", projectGitBasedVersion.getCommitRefType().equals("branch") ? projectGitBasedVersion.getCommitRefName() : "");
+            if(configuration.isIncludeProperties()) {
+                addVersionInformation("version", projectGitBasedVersion.getVersion(), projectGitBasedVersion.getProjectVersionDataMap());
+                projectGitBasedVersion.getProjectVersionDataMap().entrySet().stream()
+                        .filter(entry -> !entry.getKey().equals("version") && entry.getValue() != null)
+                        .forEach(entry -> virtualProjectModel.addProperty("project." + entry.getKey(), entry.getValue()));
+            }
 
 
             // ---------------- process parent -----------------------------------
@@ -267,12 +273,19 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                 }
             }
 
-            Map<String, String> projectVersionDataMap = buildCommonVersionDataMap(gav);
+            Map<String, String> projectVersionDataMap = mergeProperties(buildCommonVersionDataMap(gav));
             projectVersionDataMap.put("commit", gitRepoData.getCommit());
             projectVersionDataMap.put("commit.short", gitRepoData.getCommit().length() <= 7 ? gitRepoData.getCommit() : gitRepoData.getCommit().substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(valueGroupMap(projectVersionFormatDescription.pattern, projectCommitRefName));
-
+            Optional.ofNullable(gitRepoData.getLastTag()).ifPresent(value -> projectVersionDataMap.put("lastTag", value));
+            Optional.ofNullable(projectVersionDataMap.get("lastTag")).ifPresent(value -> {
+                for (VersionFormatDescription versionFormatDescription : configuration.getTagVersionDescriptions())
+                    if(value.matches(versionFormatDescription.pattern)) {
+                        addVersionInformation("lastTag", removePrefix(value, versionFormatDescription.prefix), projectVersionDataMap);
+                        break;
+                    }
+            });
             String versionGit = escapeVersion(substituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap));
 
             gitBasedProjectVersion = new GAVGit(
@@ -281,7 +294,8 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                     versionGit,
                     gitRepoData.getCommit(),
                     projectCommitRefType,
-                    removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix)
+                    removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix),
+                    projectVersionDataMap
             );
             gitVersionCache.put(gav, gitBasedProjectVersion);
         }
@@ -321,11 +335,33 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                     headTags = providedTag.isEmpty() ? emptyList() : singletonList(providedTag);
                 }
 
-                gitRepoData = new GitRepoData(headCommit, headBranch, headTags);
+                String lastTag = GitUtil.getLastTag(repository);
+
+                gitRepoData = new GitRepoData(headCommit, headBranch, headTags, lastTag);
                 gitRepoDataCache.put(gitDir, gitRepoData);
             }
         }
         return gitRepoData;
+    }
+
+    private Map<String, String> mergeProperties(Map<String, String> map) {
+        configuration.getProperties().forEach((key, value) -> map.put(String.valueOf(key), String.valueOf(value)));
+        return map;
+    }
+
+    private void addVersionInformation(String key, String value, Map<String, String> projectVersionDataMap) {
+        if (value != null && !value.isEmpty()) {
+            VersionInformation versionInfo = new VersionInformation(value);
+            projectVersionDataMap.put(key + ".majorVersion", String.valueOf(versionInfo.getMajor()));
+            projectVersionDataMap.put(key + ".minorVersion", String.valueOf(versionInfo.getMinor()));
+            projectVersionDataMap.put(key + ".incrementalVersion", String.valueOf(versionInfo.getPatch()));
+            projectVersionDataMap.put(key + ".buildNumber", String.valueOf(versionInfo.getBuildNumber()));
+            projectVersionDataMap.put(key + ".qualifier", versionInfo.getQualifier());
+            projectVersionDataMap.put(key + ".nextMajorVersion", String.valueOf(versionInfo.getMajor() + 1));
+            projectVersionDataMap.put(key + ".nextMinorVersion", String.valueOf(versionInfo.getMinor() + 1));
+            projectVersionDataMap.put(key + ".nextIncrementalVersion", String.valueOf(versionInfo.getPatch() + 1));
+            projectVersionDataMap.put(key + ".nextBuildNumber", String.valueOf(versionInfo.getBuildNumber() + 1));
+        }
     }
 
     private static Map<String, String> buildCommonVersionDataMap(GAV gav) {
@@ -344,12 +380,14 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
         private final String commit;
         private final String branch;
         private final List<String> tags;
+        private final String lastTag;
 
-        GitRepoData(String commit, String branch, List<String> tags) {
+        GitRepoData(String commit, String branch, List<String> tags, String lastTag) {
 
             this.commit = commit;
             this.branch = branch;
             this.tags = tags;
+            this.lastTag = lastTag;
         }
 
         public String getCommit() {
@@ -362,6 +400,10 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
         public List<String> getTags() {
             return tags;
+        }
+
+        public String getLastTag() {
+            return lastTag;
         }
     }
 }
