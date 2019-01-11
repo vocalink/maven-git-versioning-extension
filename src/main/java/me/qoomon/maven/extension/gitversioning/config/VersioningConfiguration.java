@@ -11,19 +11,28 @@ import java.util.Properties;
  */
 public class VersioningConfiguration {
 
+    private final boolean enabled;
     private final List<VersionFormatDescription> branchVersionDescriptions;
     private final List<VersionFormatDescription> tagVersionDescriptions;
     private final VersionFormatDescription commitVersionDescription;
+    private final String providedBranch;
+    private final String providedTag;
+    private final String providedCommit;
     private final Properties properties = new Properties();
     private final boolean includeProperties;
 
-    public VersioningConfiguration(List<VersionFormatDescription> branchVersionDescriptions,
+    public VersioningConfiguration(boolean enabled, List<VersionFormatDescription> branchVersionDescriptions,
                                    List<VersionFormatDescription> tagVersionDescriptions,
                                    VersionFormatDescription commitVersionDescription,
+                                   String providedBranch, String providedTag, String providedCommit,
                                    Boolean includeProperties) {
+        this.enabled = enabled;
         this.branchVersionDescriptions = Objects.requireNonNull(branchVersionDescriptions);
         this.tagVersionDescriptions = Objects.requireNonNull(tagVersionDescriptions);
         this.commitVersionDescription = Objects.requireNonNull(commitVersionDescription);
+        this.providedBranch = providedBranch;
+        this.providedTag = providedTag;
+        this.providedCommit = providedCommit;
         this.includeProperties = includeProperties;
     }
 
@@ -45,6 +54,22 @@ public class VersioningConfiguration {
 
     public VersionFormatDescription getCommitVersionDescription() {
         return commitVersionDescription;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public String getProvidedBranch() {
+        return providedBranch;
+    }
+
+    public String getProvidedTag() {
+        return providedTag;
+    }
+
+    public String getProvidedCommit() {
+        return providedCommit;
     }
 
     public boolean isIncludeProperties() {

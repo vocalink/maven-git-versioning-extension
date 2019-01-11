@@ -14,7 +14,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
-public class GitUtil {
+public final class GitUtil {
 
     public static Status getStatus(Repository repository) {
         try {
@@ -24,18 +24,18 @@ public class GitUtil {
         }
     }
 
-    public static Optional<String> getHeadBranch(Repository repository) throws IOException {
+    public static String getHeadBranch(Repository repository) throws IOException {
 
         ObjectId head = repository.resolve(Constants.HEAD);
         if (head == null) {
-            return Optional.of(Constants.MASTER);
+            return Constants.MASTER;
         }
 
         if (ObjectId.isId(repository.getBranch())) {
-            return Optional.empty();
+            return null;
         }
 
-        return Optional.ofNullable(repository.getBranch());
+        return repository.getBranch();
     }
 
     public static List<String> getHeadTags(Repository repository) throws IOException {
