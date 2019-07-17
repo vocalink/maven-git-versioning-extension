@@ -313,8 +313,12 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
                 String baseVersion = baseVersion(base, projectVersionDataMap);
                 GitDescribeData gitDescribeData = getGitDescribeData(gitDir, baseVersion, false);
 
-                Optional.ofNullable(gitDescribeData.getDescribeCommit()).ifPresent(c -> projectVersionDataMap.put("version.gcommit", c));
-                Optional.ofNullable(gitDescribeData.getDescribeCommitCount()).ifPresent(cc -> projectVersionDataMap.put("version.commitCount", String.valueOf(cc)));
+                if (gitDescribeData != null) {
+                    Optional.ofNullable(gitDescribeData.getDescribeCommit())
+                            .ifPresent(c -> projectVersionDataMap.put("version.gcommit", c));
+                    Optional.ofNullable(gitDescribeData.getDescribeCommitCount())
+                            .ifPresent(cc -> projectVersionDataMap.put("version.commitCount", String.valueOf(cc)));
+                }
             }
 
             String versionGit = escapeVersion(substituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap));
