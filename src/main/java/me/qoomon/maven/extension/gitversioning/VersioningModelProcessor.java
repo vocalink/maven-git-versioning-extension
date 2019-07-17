@@ -8,7 +8,11 @@ import me.qoomon.maven.extension.gitversioning.config.model.VersionFormatDescrip
 import org.apache.maven.artifact.versioning.DefaultArtifactVersion;
 import org.apache.maven.building.Source;
 import org.apache.maven.execution.MavenSession;
-import org.apache.maven.model.*;
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Model;
+import org.apache.maven.model.Parent;
+import org.apache.maven.model.Plugin;
+import org.apache.maven.model.PluginExecution;
 import org.apache.maven.model.building.DefaultModelProcessor;
 import org.apache.maven.model.building.ModelProcessor;
 import org.apache.maven.session.scope.internal.SessionScope;
@@ -23,11 +27,18 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
-import java.util.*;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 import static java.util.Collections.emptyList;
 import static java.util.Collections.singletonList;
-import static me.qoomon.maven.extension.gitversioning.StringUtil.*;
+import static me.qoomon.maven.extension.gitversioning.StringUtil.removePrefix;
+import static me.qoomon.maven.extension.gitversioning.StringUtil.substituteText;
+import static me.qoomon.maven.extension.gitversioning.StringUtil.valueGroupMap;
 
 
 /**
@@ -40,6 +51,7 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
     // for preventing unnecessary logging
     private final Set<String> loggingBouncer = new HashSet<>();
 
+    private final Map<String, GitDescribeData> gitDescribeDataCache = new HashMap<>();
     private final Map<File, GitRepoData> gitRepoDataCache = new HashMap<>();
     private final Map<GAV, GAVGit> gitVersionCache = new HashMap<>();
 
@@ -274,18 +286,37 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
             }
 
             Map<String, String> projectVersionDataMap = mergeProperties(buildCommonVersionDataMap(gav));
-            projectVersionDataMap.put("commit", gitRepoData.getCommit());
-            projectVersionDataMap.put("commit.short", gitRepoData.getCommit().length() <= 7 ? gitRepoData.getCommit() : gitRepoData.getCommit().substring(0, 7));
+            String commit = gitRepoData.getCommit();
+            projectVersionDataMap.put("commit", commit);
+            projectVersionDataMap.put("commit.short", commit.length() <= 7 ? commit : commit.substring(0, 7));
             projectVersionDataMap.put(projectCommitRefType, removePrefix(projectCommitRefName, projectVersionFormatDescription.prefix));
             projectVersionDataMap.putAll(valueGroupMap(projectVersionFormatDescription.pattern, projectCommitRefName));
-            Optional.ofNullable(gitRepoData.getLastTag()).ifPresent(value -> projectVersionDataMap.put("lastTag", value));
-            Optional.ofNullable(projectVersionDataMap.get("lastTag")).ifPresent(value -> {
-                for (VersionFormatDescription versionFormatDescription : configuration.getTagVersionDescriptions())
-                    if(value.matches(versionFormatDescription.pattern)) {
+            Optional.ofNullable(gitRepoData.getLastTag()).ifPresent(value -> {
+                projectVersionDataMap.put("lastTag", value);
+                for (VersionFormatDescription versionFormatDescription : configuration.getTagVersionDescriptions()) {
+                    if (value.matches(versionFormatDescription.pattern)) {
                         addVersionInformation("lastTag", removePrefix(value, versionFormatDescription.prefix), projectVersionDataMap);
+                        Optional.ofNullable(gitRepoData.getDescribeCommitCount()).ifPresent(cc -> projectVersionDataMap.put("lastTag.commitCount", String.valueOf(cc)));
                         break;
                     }
+                }
             });
+
+            String base = null;
+            if (projectVersionDataMap.containsKey("version.majorVersion")) {
+                base = "version";
+            } else if (projectVersionDataMap.containsKey("lastTag.majorVersion")) {
+                base = "lastTag";
+            }
+
+            if (base != null) {
+                String baseVersion = baseVersion(base, projectVersionDataMap);
+                GitDescribeData gitDescribeData = getGitDescribeData(gitDir, baseVersion, false);
+
+                Optional.ofNullable(gitDescribeData.getDescribeCommit()).ifPresent(c -> projectVersionDataMap.put("version.gcommit", c));
+                Optional.ofNullable(gitDescribeData.getDescribeCommitCount()).ifPresent(cc -> projectVersionDataMap.put("version.commitCount", String.valueOf(cc)));
+            }
+
             String versionGit = escapeVersion(substituteText(projectVersionFormatDescription.versionFormat, projectVersionDataMap));
 
             gitBasedProjectVersion = new GAVGit(
@@ -301,6 +332,14 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
         }
         return gitBasedProjectVersion;
 
+    }
+
+    private String baseVersion(String identifier, Map<String, String> projectVersionDataMap) {
+        return projectVersionDataMap.get(identifier + ".majorVersion") +
+                "." +
+                projectVersionDataMap.get(identifier + ".minorVersion") +
+                "." +
+                projectVersionDataMap.get(identifier + ".incrementalVersion");
     }
 
     private GitRepoData getGitRepoData(File gitDir) throws IOException {
@@ -337,11 +376,39 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
 
                 String lastTag = GitUtil.getLastTag(repository);
 
-                gitRepoData = new GitRepoData(headCommit, headBranch, headTags, lastTag);
+                String describe = getGitDescribeString(repository, lastTag, true);
+
+                gitRepoData = new GitRepoData(headCommit, headBranch, headTags, lastTag, describe);
                 gitRepoDataCache.put(gitDir, gitRepoData);
             }
         }
         return gitRepoData;
+    }
+
+    private String getGitDescribeString(Repository repository, String version, boolean lastTag) throws IOException {
+        if (version != null) {
+            return lastTag
+                    ? GitUtil.getLastTagDescribe(repository, version)
+                    : GitUtil.getTagDescribe(repository, version);
+        }
+        return null;
+    }
+
+    private GitDescribeData getGitDescribeData(File gitDir, String version, boolean lastTag) throws IOException {
+        GitDescribeData gitDescribeData = gitDescribeDataCache.get(version);
+        if (gitDescribeData == null) {
+            FileRepositoryBuilder repositoryBuilder = new FileRepositoryBuilder().findGitDir(gitDir);
+            logger.debug("git directory " + repositoryBuilder.getGitDir());
+            try (Repository repository = repositoryBuilder.build()) {
+                String describe = getGitDescribeString(repository, version, lastTag);
+
+                if (describe != null) {
+                    gitDescribeData = new GitDescribeData(describe);
+                    gitDescribeDataCache.put(version, gitDescribeData);
+                }
+            }
+        }
+        return gitDescribeData;
     }
 
     private Map<String, String> mergeProperties(Map<String, String> map) {
@@ -375,15 +442,40 @@ public class VersioningModelProcessor extends DefaultModelProcessor {
         return version.replace("/", "-");
     }
 
-    private static class GitRepoData {
+    private static class GitDescribeData {
+        private final Integer describeCommitCount;
+        private final String describeCommit;
+
+        GitDescribeData(String describe) {
+            if (describe != null) {
+                String[] atoms = describe.split("-");
+
+                describeCommitCount = Integer.parseInt(atoms[atoms.length - 2]);
+                describeCommit = atoms[atoms.length - 1];
+            } else {
+                describeCommitCount = null;
+                describeCommit = null;
+            }
+        }
+
+        public Integer getDescribeCommitCount() {
+            return describeCommitCount;
+        }
+
+        public String getDescribeCommit() {
+            return describeCommit;
+        }
+    }
+
+    private static class GitRepoData extends GitDescribeData {
 
         private final String commit;
         private final String branch;
         private final List<String> tags;
         private final String lastTag;
 
-        GitRepoData(String commit, String branch, List<String> tags, String lastTag) {
-
+        GitRepoData(String commit, String branch, List<String> tags, String lastTag, String describe) {
+            super(describe);
             this.commit = commit;
             this.branch = branch;
             this.tags = tags;

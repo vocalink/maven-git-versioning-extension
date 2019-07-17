@@ -3,7 +3,7 @@ package me.qoomon.maven.extension.gitversioning;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
-import org.eclipse.jgit.errors.MissingObjectException;
+import org.eclipse.jgit.errors.InvalidPatternException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
 import org.eclipse.jgit.lib.Repository;
@@ -88,13 +88,29 @@ public final class GitUtil {
                 Map<ObjectId, String> namedCommits = git.nameRev().addPrefix("refs/tags/").add(commit).call();
                 if (namedCommits.containsKey(commit.getId())) {
                     tag = namedCommits.get(commit.getId());
-                    break;
+                    if (!tag.contains("^") && !tag.contains("~")) {
+                        break;
+                    }
+                    tag = null;
                 }
             }
-        } catch (GitAPIException | MissingObjectException e) {
+        } catch (GitAPIException | IOException e) {
             throw new RuntimeException(e);
         }
 
         return tag;
+    }
+
+    public static String getLastTagDescribe(Repository repository, String lastTag) {
+        return getTagDescribe(repository, lastTag + "*");
+    }
+
+    public static String getTagDescribe(Repository repository, String tag) {
+        try {
+            Git git = Git.wrap(repository);
+            return git.describe().setLong(true).setTags(true).setMatch(tag).call();
+        } catch (GitAPIException | InvalidPatternException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

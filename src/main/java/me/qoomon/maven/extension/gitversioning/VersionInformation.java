@@ -113,7 +113,7 @@ public class VersionInformation
 
     }
 
-    public VersionInformation(String version )
+    public VersionInformation(String version)
     {
         Matcher matcherDigits = DIGITS.matcher( version );
         if ( matcherDigits.matches() )
