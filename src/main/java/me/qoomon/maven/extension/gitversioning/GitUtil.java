@@ -88,7 +88,10 @@ public final class GitUtil {
                 Map<ObjectId, String> namedCommits = git.nameRev().addPrefix("refs/tags/").add(commit).call();
                 if (namedCommits.containsKey(commit.getId())) {
                     tag = namedCommits.get(commit.getId());
-                    break;
+                    if (!tag.contains("^") && !tag.contains("~")) {
+                        break;
+                    }
+                    tag = null;
                 }
             }
         } catch (GitAPIException | MissingObjectException e) {
