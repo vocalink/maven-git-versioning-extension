@@ -3,15 +3,16 @@ package me.qoomon.maven.extension.gitversioning;
 import org.eclipse.jgit.api.Git;
 import org.eclipse.jgit.api.Status;
 import org.eclipse.jgit.api.errors.GitAPIException;
+import org.eclipse.jgit.errors.MissingObjectException;
 import org.eclipse.jgit.lib.Constants;
 import org.eclipse.jgit.lib.ObjectId;
-import org.eclipse.jgit.lib.Ref;
 import org.eclipse.jgit.lib.Repository;
-import org.eclipse.jgit.revwalk.RevWalk;
+import org.eclipse.jgit.revwalk.RevCommit;
 
 import java.io.IOException;
-import java.util.*;
-import java.util.regex.Pattern;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 public final class GitUtil {
@@ -79,21 +80,21 @@ public final class GitUtil {
         String tag = null;
 
         try {
-            final RevWalk walk = new RevWalk(repository);
-            final List<Ref> tags = repository.getRefDatabase().getRefsByPrefix("refs/tags/");
+            Git git = Git.wrap(repository);
 
-            if(!tags.isEmpty()) {
-                final ArrayList<Ref> sorted = new ArrayList<>(tags);
-                sorted.sort(Comparator.comparing(o -> {
-                    try {
-                        return walk.parseTag(o.getObjectId()).getTaggerIdent().getWhen();
-                    } catch (IOException e) {
-                        throw new RuntimeException(e);
+            Iterable<RevCommit> revCommits = git.log().call();
+
+            for (RevCommit commit : revCommits) {
+                Map<ObjectId, String> namedCommits = git.nameRev().addPrefix("refs/tags/").add(commit).call();
+                if (namedCommits.containsKey(commit.getId())) {
+                    tag = namedCommits.get(commit.getId());
+                    if (!tag.contains("^") && !tag.contains("~")) {
+                        break;
                     }
-                }));
-                tag = sorted.get(sorted.size() - 1).getName().replaceFirst(Pattern.quote("refs/tags/"), "");
+                    tag = null;
+                }
             }
-        } catch (IOException e) {
+        } catch (GitAPIException | MissingObjectException e) {
             throw new RuntimeException(e);
         }
 
