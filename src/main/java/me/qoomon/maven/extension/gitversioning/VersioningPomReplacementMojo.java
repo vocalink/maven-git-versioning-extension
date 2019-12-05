@@ -20,7 +20,7 @@ import java.io.File;
  * utilized by {@link VersioningModelProcessor}
  */
 @Mojo(name = VersioningPomReplacementMojo.GOAL,
-        defaultPhase = LifecyclePhase.PREPARE_PACKAGE,
+        defaultPhase = LifecyclePhase.INITIALIZE,
         instantiationStrategy = InstantiationStrategy.SINGLETON,
         threadSafe = true)
 public class VersioningPomReplacementMojo extends AbstractMojo {
